@@ -5,7 +5,20 @@ set -ex
 
 echo "Applying Fe02-OS image identity..."
 
-IMAGE_PRETTY_NAME="Fe02-OS"
+# GRUB's boot entry title is built by ostree purely from os-release
+# PRETTY_NAME (plus a commit "version" metadata key that the bootc
+# container-native import path never sets - see ostree-rs-ext's import()).
+# So the variant and build date have to be baked into PRETTY_NAME itself,
+# there's no other field ostree will actually surface in the boot menu.
+if [ "${GAMING}" = "true" ]; then
+    VARIANT_LABEL="${DESKTOP_ENV}-gaming"
+else
+    VARIANT_LABEL="${DESKTOP_ENV}"
+fi
+BUILD_DATE="$(date +%Y%m%d)"
+
+IMAGE_NAME="Fe02-OS"
+IMAGE_PRETTY_NAME="Fe02-OS (${VARIANT_LABEL}) ${BUILD_DATE}"
 IMAGE_LIKE="fedora"
 HOME_URL="https://github.com/m-fe02/Fe02-OS"
 DOCUMENTATION_URL="https://github.com/m-fe02/Fe02-OS"
@@ -18,7 +31,7 @@ OS_RELEASE_FILE="/usr/lib/os-release"
 
 sed -i "s|^VARIANT_ID=.*|VARIANT_ID=${VARIANT_ID}|" "${OS_RELEASE_FILE}"
 sed -i "s|^PRETTY_NAME=.*|PRETTY_NAME=\"${IMAGE_PRETTY_NAME}\"|" "${OS_RELEASE_FILE}"
-sed -i "s|^NAME=.*|NAME=\"${IMAGE_PRETTY_NAME}\"|" "${OS_RELEASE_FILE}"
+sed -i "s|^NAME=.*|NAME=\"${IMAGE_NAME}\"|" "${OS_RELEASE_FILE}"
 sed -i "s|^HOME_URL=.*|HOME_URL=\"${HOME_URL}\"|" "${OS_RELEASE_FILE}"
 sed -i "s|^DOCUMENTATION_URL=.*|DOCUMENTATION_URL=\"${DOCUMENTATION_URL}\"|" "${OS_RELEASE_FILE}"
 sed -i "s|^SUPPORT_URL=.*|SUPPORT_URL=\"${SUPPORT_URL}\"|" "${OS_RELEASE_FILE}"
