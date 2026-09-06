@@ -13,11 +13,23 @@ function show_usage() {
 }
 
 function update_image() {
-    echo "==> Upgrading system image..."
+    echo -n "==> Upgrading system image "
     # Routed through fe02-update-image.service (see the matching polkit
     # rule) so this never needs a sudo password, e.g. when launched from
-    # the desktop entry.
-    systemctl start --wait fe02-update-image.service
+    # the desktop entry. Started non-blocking so we can print dots while it
+    # runs, since the unit's own output only goes to the journal.
+    systemctl start --no-block fe02-update-image.service
+
+    while [ "$(systemctl is-active fe02-update-image.service)" = "activating" ]; do
+        echo -n "."
+        sleep 1
+    done
+    echo ""
+
+    if systemctl is-failed --quiet fe02-update-image.service; then
+        echo "Image upgrade failed. See: journalctl -xeu fe02-update-image.service"
+        return 1
+    fi
 }
 
 function update_flatpaks() {
