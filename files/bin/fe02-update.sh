@@ -32,6 +32,10 @@ function update_image() {
     fi
 }
 
+function image_staged() {
+    bootc status --json | jq -e '.status.staged != null' &>/dev/null
+}
+
 function update_flatpaks() {
     if ! command -v flatpak &>/dev/null; then
         echo "==> Flatpak not found, skipping."
@@ -56,7 +60,20 @@ case "$1" in
         update_flatpaks
         update_distrobox
         echo ""
-        echo "Update complete. Reboot to apply the new image, if staged."
+        if image_staged; then
+            echo "A new system image is staged."
+            read -p "Reboot now? (y/N): " confirm
+            if [[ $confirm == [yY] ]]; then
+                # Plain reboot, not sudo: systemd-logind authorizes it for
+                # the active local session without a password, same as the
+                # desktop's own Restart button.
+                reboot
+            else
+                echo "Reboot later to apply the new image."
+            fi
+        else
+            echo "Update complete. No new image was staged."
+        fi
         ;;
     status)
         bootc status | grep -E "Booted|Queued|Image:"
