@@ -12,6 +12,8 @@ function show_usage() {
     echo "  status   - Show current booted and staged images"
 }
 
+IMAGE_STAGED=0
+
 function update_image() {
     echo -n "==> Upgrading system image "
     # Routed through fe02-update-image.service (see the matching polkit
@@ -19,6 +21,8 @@ function update_image() {
     # the desktop entry. Started non-blocking so we can print dots while it
     # runs, since the unit's own output only goes to the journal.
     systemctl start --no-block fe02-update-image.service
+    local invocation_id
+    invocation_id="$(systemctl show -p InvocationID --value fe02-update-image.service)"
 
     while [ "$(systemctl is-active fe02-update-image.service)" = "activating" ]; do
         echo -n "."
@@ -30,10 +34,14 @@ function update_image() {
         echo "Image upgrade failed. See: journalctl -xeu fe02-update-image.service"
         return 1
     fi
-}
 
-function image_staged() {
-    bootc status --json | jq -e '.status.staged != null' &>/dev/null
+    # bootc status requires root, so instead of querying it directly (which
+    # fe02-update, run unprivileged, can't do), scope the journal to just
+    # this run via its invocation ID and look for bootc's own "staged a new
+    # deployment" message.
+    if journalctl "_SYSTEMD_INVOCATION_ID=${invocation_id}" 2>/dev/null | grep -q "^Queued for next boot:"; then
+        IMAGE_STAGED=1
+    fi
 }
 
 function update_flatpaks() {
@@ -60,7 +68,7 @@ case "$1" in
         update_flatpaks
         update_distrobox
         echo ""
-        if image_staged; then
+        if [ "$IMAGE_STAGED" -eq 1 ]; then
             echo "A new system image is staged."
             read -p "Reboot now? (y/N): " confirm
             if [[ $confirm == [yY] ]]; then
@@ -76,7 +84,8 @@ case "$1" in
         fi
         ;;
     status)
-        bootc status | grep -E "Booted|Queued|Image:"
+        # bootc status requires root even for a read-only query.
+        sudo bootc status | grep -E "Booted|Queued|Image:"
         ;;
     -h|--help)
         show_usage
