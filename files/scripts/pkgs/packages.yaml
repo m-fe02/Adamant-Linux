@@ -30,7 +30,7 @@ packages:
     - stow
     - fastfetch
     - tailscale
-    - fuse-libs
+    - fuse
 
   # Only variant-specific packages.
   variants:
